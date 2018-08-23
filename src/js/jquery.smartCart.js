@@ -23,6 +23,7 @@
             cartItemQtyTemplate: '{display_price} × {display_quantity} = {display_amount}',
             productContainerSelector: '.sc-product-item',
             productElementSelector: '*', // input, textarea, select, div, p
+            productPriceSelector: 'input[name=product_price]', // input with price
             addCartSelector: '.sc-add-to-cart',
             paramSettings : { // Map the paramters
                 productPrice: 'product_price',
@@ -84,6 +85,9 @@
             // Add toolbar
             this._setToolbar();
             
+            // Show products prices
+            this._showPrices();
+
             // Assign plugin events
             this._setEvents();
             
@@ -159,11 +163,39 @@
             toolbar.append(toolbarButtonPanel);
             this.cart_element.append(toolbar);
         },
+        /*
+         * Show products prices
+         */
+        _showPrices: function () {
+            var mi = this;
+            $(this.options.productContainerSelector).each(function () {
+                var size = $(this).find("select[name=product_size]").val();
+                mi._showPrice($(this), size);
+            });
+        },
+        /*
+         * Show product price
+         */
+        _showPrice: function (cont, size) {
+            var price = cont.find('.price[data-size="' + size + '"]');
+            if (price.length) {
+                price.show();
+            } else {
+                cont.find('.price').not('.price[data-size]').show();
+            }
+        },
         /* 
          * Set events for the cart
          */
         _setEvents: function () {
             var mi = this;
+            // Size changed
+            $('select[name=product_size]').on( "change", function() {
+                var cont = $(this).parents(mi.options.productContainerSelector);
+                cont.find('.price').hide();
+                mi._showPrice(cont, $(this).val());
+            });
+
             // Capture add to cart button events
             $(this.options.addCartSelector).on( "click", function(e) {
                 e.preventDefault();
@@ -213,15 +245,25 @@
         _getProductDetails: function (elm) {
             var mi = this;
             var p = {};
-            elm.parents(this.options.productContainerSelector)
-                .find(this.options.productElementSelector)
+            var cont = elm.parents(this.options.productContainerSelector);
+            cont.find(this.options.productElementSelector)
                 .each(function() {
                     if ($(this).is('[name]') === true || typeof $(this).data('name') !== typeof undefined) {
                         var key = $(this).attr('name') ? $(this).attr('name') : $(this).data('name'); 
                         var val = mi._getContent($(this));
-                        if(key && val){
+                        if(key && val && key != "product_price"){
                             p[key] = val;    
                         }
+                    }
+                });
+            cont.find(this.options.productPriceSelector)
+                .each(function() {
+                    var val = mi._getContent($(this));
+                    var size = $(this).data('size');
+                    if (typeof size !== typeof undefined && size == p.product_size) {
+                        p.product_price = val;
+                    } else if (typeof size === typeof undefined && !p.hasOwnProperty('product_price')) {
+                        p.product_price = val;
                     }
                 });
             return p;
@@ -231,7 +273,6 @@
          */
         _addToCart: function (p) {
             var mi = this;
-            
             if (!p.hasOwnProperty(this.options.paramSettings.productPrice)) {
                 this._logError('Price is not set for the item');
                 return false;

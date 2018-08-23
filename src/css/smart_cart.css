@@ -112,6 +112,10 @@
     transition: all 0.2s ease-in-out 0s;
 }
 
+.sc-product-item .price {
+    display: none;
+}
+
 .sc-added-item {
     border-color: #5cb85c;
 }
