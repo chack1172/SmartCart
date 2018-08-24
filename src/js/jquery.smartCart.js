@@ -35,6 +35,7 @@
                 cartTitle: "Shopping Cart",
                 checkout: 'Checkout',
                 clear: 'Clear',
+                discount: 'Discount: ',
                 subtotal: 'Subtotal:',
                 cartRemove:'×',
                 cartEmpty: 'Cart is Empty!<br />Choose your products'
@@ -61,6 +62,7 @@
                 checkoutButtonImage: '', // image for the checkout button
                 toolbarExtraButtons: [] // Extra buttons to show on toolbar, array of jQuery input/buttons elements
             },
+            discounts: [],
             debug: false
         };
 
@@ -154,6 +156,9 @@
             
             // Cart Summary
             if(this.options.toolbarSettings.showCartSummary){
+                var panelDiscount = $('<div class="sc-cart-summary-discount" style="display: none">');
+                panelDiscount.append(this.options.lang.discount).append(' <span class="sc-cart-discount">0</span>');
+                toolbarSummaryPanel.append(panelDiscount);
                 var panelSubTotal = $('<div class="sc-cart-summary-subtotal">');
                 panelSubTotal.append(this.options.lang.subtotal).append(' <span class="sc-cart-subtotal">0</span>');
                 toolbarSummaryPanel.append(panelSubTotal);
@@ -396,8 +401,15 @@
          */
         _hasCartChange: function () {
             $('.sc-cart-count',this.cart_element).text(this.cart.length);
+            $('.sc-cart-discount',this.element).text(this._getCartDiscount(true));
             $('.sc-cart-subtotal',this.element).text(this._getCartSubtotal());
             
+            if(this._getCartDiscount(false) > 0){
+                $('.sc-cart-summary-discount').show();
+            }else{
+                $('.sc-cart-summary-discount').hide();
+            }
+
             if(this.cart.length === 0){
                 $('.sc-cart-item-list',this.cart_element).empty().append($('<div class="sc-cart-empty-msg">' + this.options.lang.cartEmpty + '</div>'));
                 $(this.options.productContainerSelector).removeClass('sc-added-item');
@@ -413,13 +425,42 @@
             // Update cart value to the  cart hidden element 
             $('#' + this.options.resultName, this.cart_element).val(JSON.stringify(this.cart));
         },
+        /*
+         * Get how many items the cart has
+         */
+        _getCartQuantity: function () {
+            var mi = this;
+            var items = 0;
+            $.each(this.cart, function( i, p ) {
+                items += parseInt(p[mi.options.paramSettings.productQuantity]);
+            });
+            return items;
+        },
+        /*
+         * Calculates the cart discount
+         */
+        _getCartDiscount: function (formatted) {
+            var mi = this;
+            var discount = 0;
+            var items = this._getCartQuantity();
+            $.each(this.options.discounts, function( i, d ) {
+                if(items >= d.minItems){
+                    discount += d.value;
+                }
+            });
+            if(formatted){
+                return this._getMoneyFormatted(discount);
+            }else{
+                return discount;
+            }
+        },
         /* 
          * Calculates the cart subtotal
          */
         _getCartSubtotal: function () {
             var mi = this;
             var subtotal = 0;
-            $.each(this.cart, function( i, p ) {   
+            $.each(this.cart, function( i, p ) {
                 if(mi._getValidateNumber(p[mi.options.paramSettings.productPrice])){
                     subtotal += (p[mi.options.paramSettings.productPrice] - 0) * (p[mi.options.paramSettings.productQuantity] - 0);
                 }
@@ -472,6 +513,11 @@
                                .append('<input class="sc-paypal-input" name="amount_' + itemNumber + '" value="' + mi._getValueOrEmpty(p[mi.options.paramSettings.productPrice]) + '" type="hidden">')
                                .append('<input class="sc-paypal-input" name="quantity_' + itemNumber + '" value="' + mi._getValueOrEmpty(p[mi.options.paramSettings.productQuantity]) + '" type="hidden">');
                     });
+
+                    var discount = this._getCartDiscount(false);
+                    if(discount > 0){
+                        formElm.append('<input class="sc-paypal-input" name="discount_amount_1" value="' + discount + '" type="hidden">');
+                    }
 
                     formElm.submit();
                     this._triggerEvent("cartSubmitted", [this.cart]);
